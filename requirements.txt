@@ -1,0 +1,6 @@
+azure-functions>=1.21.0
+azure-identity>=1.19.0
+azure-keyvault-secrets>=4.9.0
+snowflake-connector-python>=3.11.0
+cryptography>=42.0.0
+requests>=2.32.0

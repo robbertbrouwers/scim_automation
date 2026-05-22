@@ -1,0 +1,82 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths: ['infra/**']
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC token exchange
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep
+        id: deploy
+        run: |
+          output=$(az deployment group create \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --query "properties.outputs" \
+            --output json)
+
+          echo "key-vault-name=$(echo "$output" | jq -r '.keyVaultName.value')" >> "$GITHUB_OUTPUT"
+          echo "function-app-name=$(echo "$output" | jq -r '.functionAppName.value')" >> "$GITHUB_OUTPUT"
+          echo "managed-identity-id=$(echo "$output" | jq -r '.managedIdentityPrincipalId.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Write Key Vault secrets
+        # Secrets are sourced from GitHub Actions secrets — never stored in the repo.
+        # The deploying SP needs Key Vault Secrets Officer on the vault (granted by Bicep).
+        env:
+          KV: ${{ steps.deploy.outputs.key-vault-name }}
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_AUTOMATION_PRIVATE_KEY }}
+        run: |
+          az keyvault secret set --vault-name "$KV" \
+            --name "snowflake-account" \
+            --value "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+
+          az keyvault secret set --vault-name "$KV" \
+            --name "snowflake-automation-user" \
+            --value "${{ secrets.SNOWFLAKE_AUTOMATION_USER }}"
+
+          # Write PEM via file to preserve newlines (shell --value expansion mangles multiline)
+          printf '%s' "$SNOWFLAKE_PRIVATE_KEY" > /tmp/pk.pem
+          az keyvault secret set --vault-name "$KV" \
+            --name "snowflake-automation-private-key" \
+            --file /tmp/pk.pem
+          rm -f /tmp/pk.pem
+
+          az keyvault secret set --vault-name "$KV" \
+            --name "entra-scim-app-object-id" \
+            --value "${{ secrets.ENTRA_SCIM_APP_OBJECT_ID }}"
+
+# ── Required GitHub Actions secrets ─────────────────────────────────────────
+# AZURE_CLIENT_ID          — app (client) ID of the GitHub Actions federated SP
+# AZURE_TENANT_ID          — Entra tenant ID
+# AZURE_SUBSCRIPTION_ID    — target Azure subscription ID
+# AZURE_RESOURCE_GROUP     — resource group to deploy into
+# SNOWFLAKE_ACCOUNT        — Snowflake account identifier
+# SNOWFLAKE_AUTOMATION_USER     — Snowflake user the function connects as
+# SNOWFLAKE_AUTOMATION_PRIVATE_KEY — PEM private key for key-pair auth (no passphrase)
+# ENTRA_SCIM_APP_OBJECT_ID — object ID of the Entra enterprise application
+#
+# OIDC setup (one-time):
+#   az ad app federated-credential create --id <client-id> --parameters '{
+#     "name": "github-actions",
+#     "issuer": "https://token.actions.githubusercontent.com",
+#     "subject": "repo:<owner>/<repo>:ref:refs/heads/main",
+#     "audiences": ["api://AzureADTokenExchange"]
+#   }'

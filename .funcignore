@@ -1,0 +1,16 @@
+.venv
+.vscode
+.github
+.claude
+infra
+sql
+__pycache__
+*.pyc
+*.pyo
+local.settings.json
+*.md
+.git
+.gitignore
+.funcignore
+Thumbs.db
+.DS_Store

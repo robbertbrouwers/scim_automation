@@ -1,0 +1,10 @@
+.venv/
+.python_packages/
+local.settings.json
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/
