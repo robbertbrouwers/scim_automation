@@ -6,6 +6,9 @@ param keyVaultName string
 // Storage account name: strip hyphens, append 4-char hash for uniqueness, cap at 24 chars
 var storageAccountName = take('${replace('${prefix}stg', '-', '')}${take(uniqueString(resourceGroup().id, prefix), 4)}', 24)
 
+// Function app name: append 4-char hash for global DNS uniqueness
+var functionAppName = '${prefix}-func-${take(uniqueString(resourceGroup().id, prefix), 4)}'
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -31,7 +34,7 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
 }
 
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
-  name: '${prefix}-func'
+  name: functionAppName
   location: location
   kind: 'functionapp,linux'
   identity: {
