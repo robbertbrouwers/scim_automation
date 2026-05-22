@@ -3,8 +3,8 @@ param location string
 param appInsightsConnectionString string
 param keyVaultName string
 
-// Storage account name: strip hyphens and cap at 24 chars
-var storageAccountName = take(replace('${prefix}stg', '-', ''), 24)
+// Storage account name: strip hyphens, append 4-char hash for uniqueness, cap at 24 chars
+var storageAccountName = take('${replace('${prefix}stg', '-', '')}${take(uniqueString(resourceGroup().id, prefix), 4)}', 24)
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
