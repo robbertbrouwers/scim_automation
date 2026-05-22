@@ -7,7 +7,7 @@ param adminObjectId string
 @allowed(['ServicePrincipal', 'User', 'Group'])
 param adminPrincipalType string = 'ServicePrincipal'
 
-var kvName = '${prefix}-kv1'
+var kvName = '${prefix}-kv2'
 
 // Key Vault Secrets Officer — lets the deploying identity write secrets
 var secretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
